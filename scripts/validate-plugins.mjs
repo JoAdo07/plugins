@@ -50,6 +50,12 @@ if (!validateMarketplace(marketplace)) {
 
 // 2. Validate each plugin
 for (const entry of marketplace.plugins ?? []) {
+  // Remote URLs are a valid `source` per the marketplace schema
+  // (schemas/marketplace.schema.json:68), but `resolve()` cannot turn one into
+  // a local directory, so skip them here instead of failing with a misleading
+  // "does not exist" error.
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(entry.source)) continue;
+
   const pluginDir = resolve(root, entry.source);
   const pluginJsonPath = resolve(pluginDir, ".cursor-plugin/plugin.json");
 
@@ -98,6 +104,10 @@ const claudeMarketplace = existsSync(claudeMarketplacePath)
   : { plugins: [] };
 
 for (const entry of claudeMarketplace.plugins ?? []) {
+  // Remote URLs are a valid `source` per the marketplace schema, but `resolve()`
+  // cannot turn one into a local directory — skip them here.
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(entry.source)) continue;
+
   const pluginDir = resolve(root, entry.source);
   const pluginJsonPath = resolve(pluginDir, ".claude-plugin/plugin.json");
 
