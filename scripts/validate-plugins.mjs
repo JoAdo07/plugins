@@ -31,6 +31,21 @@ function fail(message) {
   errors++;
 }
 
+// The schema allows `source` to be a remote URL. Nothing here fetches it, so
+// report the skip instead of resolving it as a path (which turns "https://x"
+// into "<root>/https:/x" and reports a missing directory).
+function isRemoteSource(source) {
+  return typeof source === "string" && /^https?:\/\//i.test(source);
+}
+
+function skipRemoteSource(entry) {
+  if (!isRemoteSource(entry.source)) return false;
+  console.log(
+    `INFO: Plugin "${entry.name}": remote source "${entry.source}" is not validated locally`
+  );
+  return true;
+}
+
 // 1. Validate marketplace.json
 const marketplacePath = resolve(root, ".cursor-plugin/marketplace.json");
 
@@ -50,11 +65,7 @@ if (!validateMarketplace(marketplace)) {
 
 // 2. Validate each plugin
 for (const entry of marketplace.plugins ?? []) {
-  // Remote URLs are a valid `source` per the marketplace schema
-  // (schemas/marketplace.schema.json:68), but `resolve()` cannot turn one into
-  // a local directory, so skip them here instead of failing with a misleading
-  // "does not exist" error.
-  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(entry.source)) continue;
+  if (skipRemoteSource(entry)) continue;
 
   const pluginDir = resolve(root, entry.source);
   const pluginJsonPath = resolve(pluginDir, ".cursor-plugin/plugin.json");
@@ -104,9 +115,7 @@ const claudeMarketplace = existsSync(claudeMarketplacePath)
   : { plugins: [] };
 
 for (const entry of claudeMarketplace.plugins ?? []) {
-  // Remote URLs are a valid `source` per the marketplace schema, but `resolve()`
-  // cannot turn one into a local directory — skip them here.
-  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(entry.source)) continue;
+  if (skipRemoteSource(entry)) continue;
 
   const pluginDir = resolve(root, entry.source);
   const pluginJsonPath = resolve(pluginDir, ".claude-plugin/plugin.json");
@@ -136,6 +145,7 @@ for (const entry of [
   ...(marketplace.plugins ?? []),
   ...(claudeMarketplace.plugins ?? []),
 ]) {
+  if (isRemoteSource(entry.source)) continue;
   sources.set(resolve(root, entry.source), entry.name);
 }
 
